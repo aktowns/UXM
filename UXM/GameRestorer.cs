@@ -25,12 +25,12 @@ namespace UXM
                 return ex.Message;
             }
 
-            if (File.Exists(gameDir + "\\_backup\\" + exeName))
+            if (File.Exists(Path.Combine(gameDir, "_backup", exeName)))
             {
                 try
                 {
                     File.Delete(exePath);
-                    File.Move(gameDir + "\\_backup\\" + exeName, exePath);
+                    File.Move(Path.Combine(gameDir, "_backup", exeName), exePath);
                 }
                 catch (Exception ex)
                 {
@@ -49,8 +49,8 @@ namespace UXM
                 progress.Report(((i + 1.0) / totalSteps,
                     $"Restoring directory \"{restore}\" ({i + 1}/{gameInfo.BackupDirs.Count})..."));
 
-                string restoreSource = gameDir + "\\_backup\\" + restore;
-                string restoreTarget = gameDir + "\\" + restore;
+                var restoreSource = Path.Combine(gameDir, "_backup", restore);
+                var restoreTarget = Path.Combine(gameDir, restore);
 
                 if (!Directory.Exists(restoreSource)) continue;
                 try
@@ -77,8 +77,8 @@ namespace UXM
                     if (ct.IsCancellationRequested)
                         return null;
 
-                    if (Directory.Exists(gameDir + "\\" + dir))
-                        Directory.Delete(gameDir + "\\" + dir, true);
+                    if (Directory.Exists(Path.Combine(gameDir, dir)))
+                        Directory.Delete(Path.Combine(gameDir, dir), true);
                 }
             }
             catch (Exception ex)

@@ -55,11 +55,12 @@ namespace UXM
             }
             
 #if DEBUG
-            string gameInfo = File.ReadAllText($@"..\..\dist\res\{prefix}GameInfo.xml");
-            string dictionary = File.ReadAllText($@"..\..\dist\res\{prefix}Dictionary.txt");
+            var basePath = Path.Combine("..", "..", "dist", "res");
+            var gameInfo = File.ReadAllText(Path.Combine(basePath, $@"{prefix}GameInfo.xml"));
+            var dictionary = File.ReadAllText(Path.Combine(basePath, $@"{prefix}Dictionary.txt"));
 #else
-            string gameInfo = File.ReadAllText($@"res\{prefix}GameInfo.xml");
-            string dictionary = File.ReadAllText($@"res\{prefix}Dictionary.txt");
+            string gameInfo = File.ReadAllText(Path.Combine("res", $@"{prefix}GameInfo.xml"));
+            string dictionary = File.ReadAllText(Path.Combine("res", $@"{prefix}Dictionary.txt"));
 #endif
             return new GameInfo(gameInfo, dictionary);
         }
