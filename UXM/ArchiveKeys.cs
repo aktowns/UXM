@@ -4,7 +4,7 @@ namespace UXM
 {
     static class ArchiveKeys
     {
-        public static Dictionary<string, string> DarkSouls3Keys = new Dictionary<string, string>
+        public static readonly Dictionary<string, string> DarkSouls3Keys = new Dictionary<string, string>
         {
             ["Data1"] =
 @"-----BEGIN RSA PUBLIC KEY-----
@@ -77,7 +77,7 @@ WVUjhLm+/uj8r8PNgolerDeS+8FM5Bpe9QIEHwCZLw==
 -----END RSA PUBLIC KEY-----",
         };
 
-        public static Dictionary<string, string> SekiroKeys = new Dictionary<string, string>
+        public static readonly Dictionary<string, string> SekiroKeys = new Dictionary<string, string>
         {
             ["Data1"] =
 @"-----BEGIN RSA PUBLIC KEY-----
@@ -130,7 +130,7 @@ TCJKeE/wgu6hY++lBi5T3ArHZZcsbXzV6wIFAPlRTMc=
 -----END RSA PUBLIC KEY-----",
         };
 
-        public static Dictionary<string, string> SekiroBonusKeys = new Dictionary<string, string>
+        public static readonly Dictionary<string, string> SekiroBonusKeys = new Dictionary<string, string>
         {
             ["Data"] =
 @"-----BEGIN RSA PUBLIC KEY-----

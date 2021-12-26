@@ -33,18 +33,26 @@ namespace UXM
         public static GameInfo GetGameInfo(Util.Game game)
         {
             string prefix;
-            if (game == Util.Game.DarkSouls2)
-                prefix = "DarkSouls2";
-            else if (game == Util.Game.Scholar)
-                prefix = "Scholar";
-            else if (game == Util.Game.DarkSouls3)
-                prefix = "DarkSouls3";
-            else if (game == Util.Game.Sekiro)
-                prefix = "Sekiro";
-            else if (game == Util.Game.SekiroBonus)
-                prefix = "SekiroBonus";
-            else
-                throw new ArgumentException("Invalid game type.");
+            switch (game)
+            {
+                case Util.Game.DarkSouls2:
+                    prefix = "DarkSouls2";
+                    break;
+                case Util.Game.Scholar:
+                    prefix = "Scholar";
+                    break;
+                case Util.Game.DarkSouls3:
+                    prefix = "DarkSouls3";
+                    break;
+                case Util.Game.Sekiro:
+                    prefix = "Sekiro";
+                    break;
+                case Util.Game.SekiroBonus:
+                    prefix = "SekiroBonus";
+                    break;
+                default:
+                    throw new ArgumentException("Invalid game type.");
+            }
             
 #if DEBUG
             string gameInfo = File.ReadAllText($@"..\..\dist\res\{prefix}GameInfo.xml");

@@ -9,9 +9,9 @@ namespace UXM
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main()
+        private static void Main()
         {
-            Properties.Settings settings = Properties.Settings.Default;
+            var settings = Properties.Settings.Default;
             if (settings.UpgradeRequired)
             {
                 settings.Upgrade();

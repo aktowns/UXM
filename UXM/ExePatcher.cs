@@ -1,21 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
 namespace UXM
 {
-    class ExePatcher
+    internal static class ExePatcher
     {
         private static readonly Encoding UTF16 = Encoding.Unicode;
 
         public static string Patch(string exePath, IProgress<(double value, string status)> progress, CancellationToken ct)
         {
             progress.Report((0, "Preparing to patch..."));
-            string gameDir = Path.GetDirectoryName(exePath);
-            string exeName = Path.GetFileName(exePath);
+            var gameDir = Path.GetDirectoryName(exePath) ?? throw new ArgumentNullException("exePath");
+            var exeName = Path.GetFileName(exePath);
 
             Util.Game game;
             GameInfo gameInfo;
@@ -31,8 +32,8 @@ namespace UXM
 
             if (game == Util.Game.Sekiro)
             {
-                DialogResult choice = MessageBox.Show("For Sekiro, most users should use Mod Engine instead of patching with UXM. Patching a vanilla exe will cause the game to crash on startup.\n" +
-                    "Are you sure you want to patch?", "Caution", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                var choice = MessageBox.Show("For Sekiro, most users should use Mod Engine instead of patching with UXM. Patching a vanilla exe will cause the game to crash on startup.\n" +
+                                             "Are you sure you want to patch?", "Caution", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (choice == DialogResult.No)
                 {
                     progress.Report((1, "Patching cancelled."));
@@ -40,12 +41,12 @@ namespace UXM
                 }
             }
 
-            if (!File.Exists(gameDir + "\\_backup\\" + exeName))
+            if (!File.Exists(Path.Combine(gameDir, "_backup", exeName)))
             {
                 try
                 {
-                    Directory.CreateDirectory(gameDir + "\\_backup");
-                    File.Copy(exePath, gameDir + "\\_backup\\" + exeName);
+                    Directory.CreateDirectory(Path.Combine(gameDir, "_backup"));
+                    File.Copy(exePath, Path.Combine(gameDir, "_backup", exeName));
                 }
                 catch (Exception ex)
                 {
@@ -65,18 +66,18 @@ namespace UXM
 
             try
             {
-                for (int i = 0; i < gameInfo.Replacements.Count; i++)
+                for (var i = 0; i < gameInfo.Replacements.Count; i++)
                 {
                     if (ct.IsCancellationRequested)
                         return null;
 
-                    string target = gameInfo.Replacements[i];
-                    string replacement = "." + new string('/', target.Length - 1);
+                    var target = gameInfo.Replacements[i];
+                    var replacement = "." + new string('/', target.Length - 1);
 
                     // Add 1.0 for preparation step
                     progress.Report(((i + 1.0) / (gameInfo.Replacements.Count + 1.0), $"Patching alias \"{target}\" ({i + 1}/{gameInfo.Replacements.Count})..."));
 
-                    replace(bytes, target, replacement);
+                    Replace(bytes, target, replacement);
                 }
             }
             catch (Exception ex)
@@ -97,32 +98,24 @@ namespace UXM
             return null;
         }
 
-        private static void replace(byte[] bytes, string target, string replacement)
+        private static void Replace(byte[] bytes, string target, string replacement)
         {
-            byte[] targetBytes = UTF16.GetBytes(target);
-            byte[] replacementBytes = UTF16.GetBytes(replacement);
+            var targetBytes = UTF16.GetBytes(target);
+            var replacementBytes = UTF16.GetBytes(replacement);
             if (targetBytes.Length != replacementBytes.Length)
                 throw new ArgumentException($"Target length: {targetBytes.Length} | Replacement length: {replacementBytes.Length}");
 
-            List<int> offsets = findBytes(bytes, targetBytes);
+            List<int> offsets = FindBytes(bytes, targetBytes);
             foreach (int offset in offsets)
                 Array.Copy(replacementBytes, 0, bytes, offset, replacementBytes.Length);
         }
 
-        private static List<int> findBytes(byte[] bytes, byte[] find)
+        private static List<int> FindBytes(IReadOnlyList<byte> bytes, IReadOnlyCollection<byte> find)
         {
-            List<int> offsets = new List<int>();
-            for (int i = 0; i < bytes.Length - find.Length; i++)
+            var offsets = new List<int>();
+            for (var i = 0; i < bytes.Count - find.Count; i++)
             {
-                bool found = true;
-                for (int j = 0; j < find.Length; j++)
-                {
-                    if (find[j] != bytes[i + j])
-                    {
-                        found = false;
-                        break;
-                    }
-                }
+                var found = !find.Where((t, j) => t != bytes[i + j]).Any();
 
                 if (found)
                     offsets.Add(i);

@@ -10,14 +10,14 @@ using System.Windows.Forms;
 
 namespace UXM
 {
-    static class ArchiveUnpacker
+    internal static class ArchiveUnpacker
     {
         private const int WRITE_LIMIT = 1024 * 1024 * 100;
 
         public static string Unpack(string exePath, IProgress<(double value, string status)> progress, CancellationToken ct)
         {
             progress.Report((0, "Preparing to unpack..."));
-            string gameDir = Path.GetDirectoryName(exePath);
+            var gameDir = Path.GetDirectoryName(exePath) ?? throw new ArgumentNullException("exePath");
 
             Util.Game game;
             GameInfo gameInfo;
@@ -32,41 +32,44 @@ namespace UXM
             }
 
             Dictionary<string, string> keys = null;
-            if (game == Util.Game.DarkSouls2 || game == Util.Game.Scholar)
+            switch (game)
             {
-                try
-                {
-                    keys = new Dictionary<string, string>();
-                    foreach (string archive in gameInfo.Archives)
+                case Util.Game.DarkSouls2:
+                case Util.Game.Scholar:
+                    try
                     {
-                        string pemPath = $@"{gameDir}\{archive.Replace("Ebl", "KeyCode")}.pem";
-                        keys[archive] = File.ReadAllText(pemPath);
+                        keys = new Dictionary<string, string>();
+                        foreach (var archive in gameInfo.Archives)
+                        {
+                            var pemPath = Path.Combine(gameDir, $@"{archive.Replace("Ebl", "KeyCode")}.pem");
+                            keys[archive] = File.ReadAllText(pemPath);
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    return $"Failed to load Dark Souls 2 archive keys.\r\n\r\n{ex}";
-                }
-            }
-            else if (game == Util.Game.DarkSouls3)
-            {
-                keys = ArchiveKeys.DarkSouls3Keys;
-            }
-            else if (game == Util.Game.Sekiro)
-            {
-                keys = ArchiveKeys.SekiroKeys;
-            }
-            else if (game == Util.Game.SekiroBonus)
-            {
-                keys = ArchiveKeys.SekiroBonusKeys;
+                    catch (Exception ex)
+                    {
+                        return $"Failed to load Dark Souls 2 archive keys.\r\n\r\n{ex}";
+                    }
+
+                    break;
+                case Util.Game.DarkSouls3:
+                    keys = ArchiveKeys.DarkSouls3Keys;
+                    break;
+                case Util.Game.Sekiro:
+                    keys = ArchiveKeys.SekiroKeys;
+                    break;
+                case Util.Game.SekiroBonus:
+                    keys = ArchiveKeys.SekiroBonusKeys;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
 
-            string drive = Path.GetPathRoot(Path.GetFullPath(gameDir));
-            DriveInfo driveInfo = new DriveInfo(drive);
+            var drive = Path.GetPathRoot(Path.GetFullPath(gameDir));
+            var driveInfo = new DriveInfo(drive);
 
             if (driveInfo.AvailableFreeSpace < gameInfo.RequiredGB * 1024 * 1024 * 1024)
             {
-                DialogResult choice = MessageBox.Show(
+                var choice = MessageBox.Show(
                     $"{gameInfo.RequiredGB} GB of free space is required to fully unpack this game; " +
                     $"only {driveInfo.AvailableFreeSpace / (1024f * 1024 * 1024):F1} GB available.\r\n" +
                     "If you're only doing a partial unpack to restore some files you may ignore this warning, " +
@@ -83,24 +86,22 @@ namespace UXM
 
             try
             {
-                for (int i = 0; i < gameInfo.BackupDirs.Count; i++)
+                for (var i = 0; i < gameInfo.BackupDirs.Count; i++)
                 {
-                    string backup = gameInfo.BackupDirs[i];
+                    var backup = gameInfo.BackupDirs[i];
                     progress.Report(((1.0 + (double)i / gameInfo.BackupDirs.Count) / (gameInfo.Archives.Count + 2.0),
                         $"Backing up directory \"{backup}\" ({i + 1}/{gameInfo.BackupDirs.Count})..."));
 
-                    string backupSource = $@"{gameDir}\{backup}";
-                    string backupTarget = $@"{gameDir}\_backup\{backup}";
+                    var backupSource = Path.Combine(gameDir, backup);
+                    var backupTarget = Path.Combine(gameDir, "_backup", backup);
 
-                    if (Directory.Exists(backupSource) && !Directory.Exists(backupTarget))
+                    if (!Directory.Exists(backupSource) || Directory.Exists(backupTarget)) continue;
+                    foreach (var file in Directory.GetFiles(backupSource, "*", SearchOption.AllDirectories))
                     {
-                        foreach (string file in Directory.GetFiles(backupSource, "*", SearchOption.AllDirectories))
-                        {
-                            string relative = file.Substring(backupSource.Length + 1);
-                            string target = backupTarget + "\\" + relative;
-                            Directory.CreateDirectory(Path.GetDirectoryName(target));
-                            File.Copy(file, target);
-                        }
+                        var relative = file.Substring(backupSource.Length + 1);
+                        var target = Path.Combine(backupTarget, relative);
+                        Directory.CreateDirectory(Path.GetDirectoryName(target));
+                        File.Copy(file, target);
                     }
                 }
             }
@@ -109,13 +110,13 @@ namespace UXM
                 return $"Failed to back up directories.\r\n\r\n{ex}";
             }
 
-            for (int i = 0; i < gameInfo.Archives.Count; i++)
+            for (var i = 0; i < gameInfo.Archives.Count; i++)
             {
                 if (ct.IsCancellationRequested)
                     return null;
 
-                string archive = gameInfo.Archives[i];
-                string error = UnpackArchive(gameDir, archive, keys[archive], i,
+                var archive = gameInfo.Archives[i];
+                var error = UnpackArchive(gameDir, archive, keys[archive], i,
                     gameInfo.Archives.Count, gameInfo.BHD5Game, gameInfo.Dictionary, progress, ct).Result;
                 if (error != null)
                     return error;
@@ -130,159 +131,149 @@ namespace UXM
             IProgress<(double value, string status)> progress, CancellationToken ct)
         {
             progress.Report(((index + 2.0) / (total + 2.0), $"Loading {archive}..."));
-            string bhdPath = $@"{gameDir}\{archive}.bhd";
-            string bdtPath = $@"{gameDir}\{archive}.bdt";
+            var bhdPath = Path.Combine(gameDir, $@"{archive}.bhd");
+            var bdtPath = Path.Combine(gameDir, $@"{archive}.bhd");
 
-            if (File.Exists(bhdPath) && File.Exists(bdtPath))
+            if (!File.Exists(bhdPath) || !File.Exists(bdtPath)) return null;
+            BHD5 bhd;
+            try
             {
-                BHD5 bhd;
-                try
+                var encrypted = true;
+                using (var fs = File.OpenRead(bhdPath))
                 {
-                    bool encrypted = true;
-                    using (FileStream fs = File.OpenRead(bhdPath))
-                    {
-                        byte[] magic = new byte[4];
-                        fs.Read(magic, 0, 4);
-                        encrypted = Encoding.ASCII.GetString(magic) != "BHD5";
-                    }
-
-                    if (encrypted)
-                    {
-                        using (MemoryStream bhdStream = CryptographyUtility.DecryptRsa(bhdPath, key))
-                        {
-                            bhd = BHD5.Read(bhdStream, gameVersion);
-                        }
-                    }
-                    else
-                    {
-                        using (FileStream bhdStream = File.OpenRead(bhdPath))
-                        {
-                            bhd = BHD5.Read(bhdStream, gameVersion);
-                        }
-                    }
-                }
-                catch (OverflowException ex)
-                {
-                    return $"Failed to open BHD:\n{bhdPath}\n\n{ex}";
+                    var magic = new byte[4];
+                    fs.Read(magic, 0, 4);
+                    encrypted = Encoding.ASCII.GetString(magic) != "BHD5";
                 }
 
-                int fileCount = bhd.Buckets.Sum(b => b.Count);
-
-                try
+                if (encrypted)
                 {
-                    var asyncFileWriters = new List<Task<long>>();
-                    using (FileStream bdtStream = File.OpenRead(bdtPath))
+                    using (var bhdStream = CryptographyUtility.DecryptRsa(bhdPath, key))
                     {
-                        int currentFile = -1;
-                        long writingSize = 0;
+                        bhd = BHD5.Read(bhdStream, gameVersion);
+                    }
+                }
+                else
+                {
+                    using (var bhdStream = File.OpenRead(bhdPath))
+                    {
+                        bhd = BHD5.Read(bhdStream, gameVersion);
+                    }
+                }
+            }
+            catch (OverflowException ex)
+            {
+                return $"Failed to open BHD:\n{bhdPath}\n\n{ex}";
+            }
 
-                        foreach (BHD5.Bucket bucket in bhd.Buckets)
+            var fileCount = bhd.Buckets.Sum(b => b.Count);
+
+            try
+            {
+                var asyncFileWriters = new List<Task<long>>();
+                using (var bdtStream = File.OpenRead(bdtPath))
+                {
+                    var currentFile = -1;
+                    long writingSize = 0;
+
+                    foreach (var bucket in bhd.Buckets.TakeWhile(bucket => !ct.IsCancellationRequested))
+                    {
+                        foreach (var header in bucket.TakeWhile(header => !ct.IsCancellationRequested))
                         {
-                            if (ct.IsCancellationRequested)
-                                break;
+                            currentFile++;
 
-                            foreach (BHD5.FileHeader header in bucket)
+                            string path;
+                            bool unknown;
+                            if (archiveDictionary.GetPath(header.FileNameHash, out path))
                             {
-                                if (ct.IsCancellationRequested)
-                                    break;
+                                unknown = false;
+                                path = gameDir + path.Replace('/', Path.DirectorySeparatorChar);
+                                if (File.Exists(path))
+                                    continue;
+                            }
+                            else
+                            {
+                                unknown = true;
+                                var filename = $"{archive}_{header.FileNameHash:D10}";
+                                var directory = Path.Combine(gameDir, "_unknown");
+                                path = Path.Combine(directory, filename);
+                                if (File.Exists(path) || Directory.Exists(directory) && Directory.GetFiles(directory, $"{filename}.*").Length > 0)
+                                    continue;
+                            }
 
-                                currentFile++;
+                            progress.Report(((index + 2.0 + currentFile / (double)fileCount) / (total + 2.0),
+                                $"Unpacking {archive} ({currentFile + 1}/{fileCount})..."));
 
-                                string path;
-                                bool unknown;
-                                if (archiveDictionary.GetPath(header.FileNameHash, out path))
+                            while (asyncFileWriters.Count > 0 && writingSize + header.PaddedFileSize > WRITE_LIMIT)
+                            {
+                                for (var i = 0; i < asyncFileWriters.Count; i++)
                                 {
-                                    unknown = false;
-                                    path = gameDir + path.Replace('/', '\\');
-                                    if (File.Exists(path))
-                                        continue;
-                                }
-                                else
-                                {
-                                    unknown = true;
-                                    string filename = $"{archive}_{header.FileNameHash:D10}";
-                                    string directory = $@"{gameDir}\_unknown";
-                                    path = $@"{directory}\{filename}";
-                                    if (File.Exists(path) || Directory.Exists(directory) && Directory.GetFiles(directory, $"{filename}.*").Length > 0)
-                                        continue;
-                                }
-
-                                progress.Report(((index + 2.0 + currentFile / (double)fileCount) / (total + 2.0),
-                                    $"Unpacking {archive} ({currentFile + 1}/{fileCount})..."));
-
-                                while (asyncFileWriters.Count > 0 && writingSize + header.PaddedFileSize > WRITE_LIMIT)
-                                {
-                                    for (int i = 0; i < asyncFileWriters.Count; i++)
-                                    {
-                                        if (asyncFileWriters[i].IsCompleted)
-                                        {
-                                            writingSize -= await asyncFileWriters[i];
-                                            asyncFileWriters.RemoveAt(i);
-                                        }
-                                    }
-
-                                    if (asyncFileWriters.Count > 0 && writingSize + header.PaddedFileSize > WRITE_LIMIT)
-                                        Thread.Sleep(10);
+                                    if (!asyncFileWriters[i].IsCompleted) continue;
+                                    writingSize -= await asyncFileWriters[i];
+                                    asyncFileWriters.RemoveAt(i);
                                 }
 
-                                byte[] bytes;
-                                try
-                                {
-                                    bytes = header.ReadFile(bdtStream);
-                                    if (unknown)
-                                    {
-                                        BinaryReaderEx br = new BinaryReaderEx(false, bytes);
-                                        if (bytes.Length >= 3 && br.GetASCII(0, 3) == "GFX")
-                                            path += ".gfx";
-                                        else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "FSB5")
-                                            path += ".fsb";
-                                        else if (bytes.Length >= 0x19 && br.GetASCII(0xC, 0xE) == "ITLIMITER_INFO")
-                                            path += ".itl";
-                                        else if (bytes.Length >= 0x10 && br.GetASCII(8, 8) == "FEV FMT ")
-                                            path += ".fev";
-                                        else if (bytes.Length >= 4 && br.GetASCII(1, 3) == "Lua")
-                                            path += ".lua";
-                                        else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "DDS ")
-                                            path += ".dds";
-                                        else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "#BOM")
-                                            path += ".txt";
-                                        else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "BHF4")
-                                            path += ".bhd";
-                                        else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "BDF4")
-                                            path += ".bdt";
-                                        else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "ENFL")
-                                            path += ".entryfilelist";
-                                        else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "DCX\0")
-                                            path += ".dcx";
-                                        br.Stream.Close();
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    return $"Failed to read file:\r\n{path}\r\n\r\n{ex}";
-                                }
+                                if (asyncFileWriters.Count > 0 && writingSize + header.PaddedFileSize > WRITE_LIMIT)
+                                    Thread.Sleep(10);
+                            }
 
-                                try
+                            byte[] bytes;
+                            try
+                            {
+                                bytes = header.ReadFile(bdtStream);
+                                if (unknown)
                                 {
-                                    Directory.CreateDirectory(Path.GetDirectoryName(path));
-                                    writingSize += bytes.Length;
-                                    asyncFileWriters.Add(WriteFileAsync(path, bytes));
+                                    var br = new BinaryReaderEx(false, bytes);
+                                    if (bytes.Length >= 3 && br.GetASCII(0, 3) == "GFX")
+                                        path += ".gfx";
+                                    else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "FSB5")
+                                        path += ".fsb";
+                                    else if (bytes.Length >= 0x19 && br.GetASCII(0xC, 0xE) == "ITLIMITER_INFO")
+                                        path += ".itl";
+                                    else if (bytes.Length >= 0x10 && br.GetASCII(8, 8) == "FEV FMT ")
+                                        path += ".fev";
+                                    else if (bytes.Length >= 4 && br.GetASCII(1, 3) == "Lua")
+                                        path += ".lua";
+                                    else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "DDS ")
+                                        path += ".dds";
+                                    else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "#BOM")
+                                        path += ".txt";
+                                    else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "BHF4")
+                                        path += ".bhd";
+                                    else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "BDF4")
+                                        path += ".bdt";
+                                    else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "ENFL")
+                                        path += ".entryfilelist";
+                                    else if (bytes.Length >= 4 && br.GetASCII(0, 4) == "DCX\0")
+                                        path += ".dcx";
+                                    br.Stream.Close();
                                 }
-                                catch (Exception ex)
-                                {
-                                    return $"Failed to write file:\r\n{path}\r\n\r\n{ex}";
-                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                return $"Failed to read file:\r\n{path}\r\n\r\n{ex}";
+                            }
+
+                            try
+                            {
+                                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                                writingSize += bytes.Length;
+                                asyncFileWriters.Add(WriteFileAsync(path, bytes));
+                            }
+                            catch (Exception ex)
+                            {
+                                return $"Failed to write file:\r\n{path}\r\n\r\n{ex}";
                             }
                         }
                     }
+                }
 
-                    foreach (Task<long> task in asyncFileWriters)
-                        await task;
-                }
-                catch (Exception ex)
-                {
-                    return $"Failed to unpack BDT:\r\n{bdtPath}\r\n\r\n{ex}";
-                }
+                foreach (var task in asyncFileWriters)
+                    await task;
+            }
+            catch (Exception ex)
+            {
+                return $"Failed to unpack BDT:\r\n{bdtPath}\r\n\r\n{ex}";
             }
 
             return null;

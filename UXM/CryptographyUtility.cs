@@ -31,25 +31,25 @@ namespace UXM
                 throw new ArgumentNullException(nameof(key));
             }
 
-            AsymmetricKeyParameter keyParameter = GetKeyOrDefault(key);
-            RsaEngine engine = new RsaEngine();
+            var keyParameter = GetKeyOrDefault(key);
+            var engine = new RsaEngine();
             engine.Init(false, keyParameter);
 
-            MemoryStream outputStream = new MemoryStream();
-            using (FileStream inputStream = File.OpenRead(filePath))
+            var outputStream = new MemoryStream();
+            using (var inputStream = File.OpenRead(filePath))
             {
 
-                int inputBlockSize = engine.GetInputBlockSize();
-                int outputBlockSize = engine.GetOutputBlockSize();
-                byte[] inputBlock = new byte[inputBlockSize];
+                var inputBlockSize = engine.GetInputBlockSize();
+                var outputBlockSize = engine.GetOutputBlockSize();
+                var inputBlock = new byte[inputBlockSize];
                 while (inputStream.Read(inputBlock, 0, inputBlock.Length) > 0)
                 {
-                    byte[] outputBlock = engine.ProcessBlock(inputBlock, 0, inputBlockSize);
+                    var outputBlock = engine.ProcessBlock(inputBlock, 0, inputBlockSize);
 
-                    int requiredPadding = outputBlockSize - outputBlock.Length;
+                    var requiredPadding = outputBlockSize - outputBlock.Length;
                     if (requiredPadding > 0)
                     {
-                        byte[] paddedOutputBlock = new byte[outputBlockSize];
+                        var paddedOutputBlock = new byte[outputBlockSize];
                         outputBlock.CopyTo(paddedOutputBlock, requiredPadding);
                         outputBlock = paddedOutputBlock;
                     }
@@ -62,11 +62,11 @@ namespace UXM
             return outputStream;
         }
 
-        public static AsymmetricKeyParameter GetKeyOrDefault(string key)
+        private static AsymmetricKeyParameter GetKeyOrDefault(string key)
         {
             try
             {
-                PemReader pemReader = new PemReader(new StringReader(key));
+                var pemReader = new PemReader(new StringReader(key));
                 return (AsymmetricKeyParameter)pemReader.ReadObject();
             }
             catch

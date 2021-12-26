@@ -4,29 +4,27 @@ using System.Text.RegularExpressions;
 
 namespace UXM
 {
-    class ArchiveDictionary
+    internal class ArchiveDictionary
     {
         private const uint PRIME = 37;
 
-        private Dictionary<uint, string> hashes;
+        private readonly Dictionary<uint, string> _hashes;
 
         public ArchiveDictionary(string dictionary)
         {
-            hashes = new Dictionary<uint, string>();
-            foreach (string line in Regex.Split(dictionary, "[\r\n]+"))
+            _hashes = new Dictionary<uint, string>();
+            foreach (var line in Regex.Split(dictionary, "[\r\n]+"))
             {
-                string trimmed = line.Trim();
-                if (trimmed.Length > 0)
-                {
-                    uint hash = ComputeHash(trimmed);
-                    hashes[hash] = trimmed;
-                }
+                var trimmed = line.Trim();
+                if (trimmed.Length <= 0) continue;
+                var hash = ComputeHash(trimmed);
+                _hashes[hash] = trimmed;
             }
         }
 
         private static uint ComputeHash(string path)
         {
-            string hashable = path.Trim().Replace('\\', '/').ToLowerInvariant();
+            var hashable = path.Trim().Replace('\\', '/').ToLowerInvariant();
             if (!hashable.StartsWith("/"))
                 hashable = '/' + hashable;
             return hashable.Aggregate(0u, (i, c) => i * PRIME + c);
@@ -34,7 +32,7 @@ namespace UXM
 
         public bool GetPath(uint hash, out string path)
         {
-            return hashes.TryGetValue(hash, out path);
+            return _hashes.TryGetValue(hash, out path);
         }
     }
 }

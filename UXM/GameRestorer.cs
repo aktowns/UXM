@@ -4,13 +4,14 @@ using System.Threading;
 
 namespace UXM
 {
-    static class GameRestorer
+    internal static class GameRestorer
     {
-        public static string Restore(string exePath, IProgress<(double value, string status)> progress, CancellationToken ct)
+        public static string Restore(string exePath, IProgress<(double value, string status)> progress,
+            CancellationToken ct)
         {
             progress.Report((0, "Restoring executable..."));
-            string gameDir = Path.GetDirectoryName(exePath);
-            string exeName = Path.GetFileName(exePath);
+            var gameDir = Path.GetDirectoryName(exePath) ?? throw new ArgumentNullException("exePath");
+            var exeName = Path.GetFileName(exePath);
 
             Util.Game game;
             GameInfo gameInfo;
@@ -42,36 +43,36 @@ namespace UXM
 
             double totalSteps = gameInfo.BackupDirs.Count + gameInfo.DeleteDirs.Count + 1;
 
-            for (int i = 0; i < gameInfo.BackupDirs.Count; i++)
+            for (var i = 0; i < gameInfo.BackupDirs.Count; i++)
             {
-                string restore = gameInfo.BackupDirs[i];
-                progress.Report(((i + 1.0) / totalSteps, $"Restoring directory \"{restore}\" ({i + 1}/{gameInfo.BackupDirs.Count})..."));
+                var restore = gameInfo.BackupDirs[i];
+                progress.Report(((i + 1.0) / totalSteps,
+                    $"Restoring directory \"{restore}\" ({i + 1}/{gameInfo.BackupDirs.Count})..."));
 
                 string restoreSource = gameDir + "\\_backup\\" + restore;
                 string restoreTarget = gameDir + "\\" + restore;
 
-                if (Directory.Exists(restoreSource))
+                if (!Directory.Exists(restoreSource)) continue;
+                try
                 {
-                    try
-                    {
-                        if (Directory.Exists(restoreTarget))
-                            Directory.Delete(restoreTarget, true);
-                        Directory.Move(restoreSource, restoreTarget);
-                    }
-                    catch (Exception ex)
-                    {
-                        return $"Failed to restore sounds.\r\n\r\n{ex}";
-                    }
+                    if (Directory.Exists(restoreTarget))
+                        Directory.Delete(restoreTarget, true);
+                    Directory.Move(restoreSource, restoreTarget);
+                }
+                catch (Exception ex)
+                {
+                    return $"Failed to restore sounds.\r\n\r\n{ex}";
                 }
             }
 
             try
             {
-                for (int i = 0; i < gameInfo.DeleteDirs.Count; i++)
+                for (var i = 0; i < gameInfo.DeleteDirs.Count; i++)
                 {
-                    string dir = gameInfo.DeleteDirs[i];
+                    var dir = gameInfo.DeleteDirs[i];
 
-                    progress.Report(((i + 1.0 + gameInfo.BackupDirs.Count) / totalSteps, $"Deleting directory \"{dir}\" ({i + 1}/{gameInfo.DeleteDirs.Count})..."));
+                    progress.Report(((i + 1.0 + gameInfo.BackupDirs.Count) / totalSteps,
+                        $"Deleting directory \"{dir}\" ({i + 1}/{gameInfo.DeleteDirs.Count})..."));
 
                     if (ct.IsCancellationRequested)
                         return null;
