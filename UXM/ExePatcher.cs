@@ -15,6 +15,7 @@ namespace UXM
         public static string Patch(string exePath, IProgress<(double value, string status)> progress, CancellationToken ct)
         {
             progress.Report((0, "Preparing to patch..."));
+            Console.WriteLine(@"Preparing to patch...");
             var gameDir = Path.GetDirectoryName(exePath) ?? throw new ArgumentNullException("exePath");
             var exeName = Path.GetFileName(exePath);
 
@@ -76,7 +77,9 @@ namespace UXM
 
                     // Add 1.0 for preparation step
                     progress.Report(((i + 1.0) / (gameInfo.Replacements.Count + 1.0), $"Patching alias \"{target}\" ({i + 1}/{gameInfo.Replacements.Count})..."));
+                    Console.WriteLine($@"Patching alias ""{target}"" ({i + 1}/{gameInfo.Replacements.Count})...");
 
+                    Console.WriteLine($@"replacing {target} with {replacement}");
                     Replace(bytes, target, replacement);
                 }
             }
@@ -95,6 +98,7 @@ namespace UXM
             }
 
             progress.Report((1, "Patching complete!"));
+            Console.WriteLine(@"Patching complete!");
             return null;
         }
 
@@ -105,8 +109,8 @@ namespace UXM
             if (targetBytes.Length != replacementBytes.Length)
                 throw new ArgumentException($"Target length: {targetBytes.Length} | Replacement length: {replacementBytes.Length}");
 
-            List<int> offsets = FindBytes(bytes, targetBytes);
-            foreach (int offset in offsets)
+            var offsets = FindBytes(bytes, targetBytes);
+            foreach (var offset in offsets)
                 Array.Copy(replacementBytes, 0, bytes, offset, replacementBytes.Length);
         }
 

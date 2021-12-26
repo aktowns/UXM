@@ -91,6 +91,7 @@ namespace UXM
                     var backup = gameInfo.BackupDirs[i];
                     progress.Report(((1.0 + (double)i / gameInfo.BackupDirs.Count) / (gameInfo.Archives.Count + 2.0),
                         $"Backing up directory \"{backup}\" ({i + 1}/{gameInfo.BackupDirs.Count})..."));
+                    Console.WriteLine($@"Backing up directory ""{backup}"" ({i + 1}/{gameInfo.BackupDirs.Count})...");
 
                     var backupSource = Path.Combine(gameDir, backup);
                     var backupTarget = Path.Combine(gameDir, "_backup", backup);
@@ -123,6 +124,7 @@ namespace UXM
             }
 
             progress.Report((1, "Unpacking complete!"));
+            Console.WriteLine(@"Unpacking complete!");
             return null;
         }
 
@@ -130,11 +132,14 @@ namespace UXM
             BHD5.Game gameVersion, ArchiveDictionary archiveDictionary,
             IProgress<(double value, string status)> progress, CancellationToken ct)
         {
+            Console.WriteLine($@"UnpackArchive({gameDir}, {archive}, {index}, {total})");
             progress.Report(((index + 2.0) / (total + 2.0), $"Loading {archive}..."));
+            Console.WriteLine($@"Loading {archive}...");
             var bhdPath = Path.Combine(gameDir, $@"{archive}.bhd");
-            var bdtPath = Path.Combine(gameDir, $@"{archive}.bhd");
+            var bdtPath = Path.Combine(gameDir, $@"{archive}.bdt");
 
             if (!File.Exists(bhdPath) || !File.Exists(bdtPath)) return null;
+            Console.WriteLine(@"Decrypting bhd");
             BHD5 bhd;
             try
             {
@@ -187,7 +192,7 @@ namespace UXM
                             if (archiveDictionary.GetPath(header.FileNameHash, out path))
                             {
                                 unknown = false;
-                                path = gameDir + path.Replace('/', Path.DirectorySeparatorChar);
+                                path = Path.Combine(gameDir, path.Replace('/', Path.DirectorySeparatorChar).TrimStart('/'));
                                 if (File.Exists(path))
                                     continue;
                             }
@@ -203,6 +208,7 @@ namespace UXM
 
                             progress.Report(((index + 2.0 + currentFile / (double)fileCount) / (total + 2.0),
                                 $"Unpacking {archive} ({currentFile + 1}/{fileCount})..."));
+                            Console.WriteLine($@"Unpacking {archive} ({currentFile + 1}/{fileCount})...");
 
                             while (asyncFileWriters.Count > 0 && writingSize + header.PaddedFileSize > WRITE_LIMIT)
                             {

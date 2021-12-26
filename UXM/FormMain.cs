@@ -14,33 +14,33 @@ namespace UXM
     public partial class FormMain : Form
     {
         private const string UPDATE_LINK = "https://www.nexusmods.com/sekiro/mods/26?tab=files";
-        private static Properties.Settings settings = Properties.Settings.Default;
+        private static readonly Properties.Settings _settings = Properties.Settings.Default;
 
-        private bool closing;
-        private CancellationTokenSource cts;
-        private IProgress<(double value, string status)> progress;
+        private bool _closing;
+        private CancellationTokenSource _cts;
+        private readonly IProgress<(double value, string status)> _progress;
 
         public FormMain()
         {
             InitializeComponent();
 
-            closing = false;
-            cts = null;
-            progress = new Progress<(double value, string status)>(ReportProgress);
+            _closing = false;
+            _cts = null;
+            _progress = new Progress<(double value, string status)>(ReportProgress);
         }
 
         private async void FormMain_Load(object sender, EventArgs e)
         {
-            Text = "UXM " + Application.ProductVersion;
+            Text = @"UXM " + Application.ProductVersion;
             EnableControls(true);
 
-            Location = settings.WindowLocation;
-            if (settings.WindowSize.Width >= MinimumSize.Width && settings.WindowSize.Height >= MinimumSize.Height)
-                Size = settings.WindowSize;
-            if (settings.WindowMaximized)
+            Location = _settings.WindowLocation;
+            if (_settings.WindowSize.Width >= MinimumSize.Width && _settings.WindowSize.Height >= MinimumSize.Height)
+                Size = _settings.WindowSize;
+            if (_settings.WindowMaximized)
                 WindowState = FormWindowState.Maximized;
 
-            txtExePath.Text = settings.ExePath;
+            txtExePath.Text = _settings.ExePath;
 
             Octokit.GitHubClient gitHubClient = new Octokit.GitHubClient(new Octokit.ProductHeaderValue("UXM"));
             try
@@ -49,19 +49,19 @@ namespace UXM
                 if (SemVersion.Parse(release.TagName) > Application.ProductVersion)
                 {
                     lblUpdate.Visible = false;
-                    LinkLabel.Link link = new LinkLabel.Link();
+                    var link = new LinkLabel.Link();
                     link.LinkData = UPDATE_LINK;
                     llbUpdate.Links.Add(link);
                     llbUpdate.Visible = true;
                 }
                 else
                 {
-                    lblUpdate.Text = "App up to date";
+                    lblUpdate.Text = @"App up to date";
                 }
             }
             catch (Exception ex) when (ex is HttpRequestException || ex is Octokit.ApiException || ex is ArgumentException)
             {
-                lblUpdate.Text = "Update status unknown";
+                lblUpdate.Text = @"Update status unknown";
             }
         }
 
@@ -72,37 +72,37 @@ namespace UXM
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (cts != null)
+            if (_cts != null)
             {
-                txtStatus.Text = "Aborting...";
-                closing = true;
+                txtStatus.Text = @"Aborting...";
+                _closing = true;
                 btnAbort.Enabled = false;
-                cts.Cancel();
+                _cts.Cancel();
                 e.Cancel = true;
             }
             else
             {
-                settings.WindowMaximized = WindowState == FormWindowState.Maximized;
+                _settings.WindowMaximized = WindowState == FormWindowState.Maximized;
                 if (WindowState == FormWindowState.Normal)
                 {
-                    settings.WindowLocation = Location;
-                    settings.WindowSize = Size;
+                    _settings.WindowLocation = Location;
+                    _settings.WindowSize = Size;
                 }
                 else
                 {
-                    settings.WindowLocation = RestoreBounds.Location;
-                    settings.WindowSize = RestoreBounds.Size;
+                    _settings.WindowLocation = RestoreBounds.Location;
+                    _settings.WindowSize = RestoreBounds.Size;
                 }
 
-                settings.ExePath = txtExePath.Text;
+                _settings.ExePath = txtExePath.Text;
             }
         }
 
         private void btnAbort_Click(object sender, EventArgs e)
         {
-            txtStatus.Text = "Aborting...";
+            txtStatus.Text = @"Aborting...";
             btnAbort.Enabled = false;
-            cts.Cancel();
+            _cts.Cancel();
         }
 
         private void btnBrowse_Click(object sender, EventArgs e)
@@ -114,7 +114,7 @@ namespace UXM
 
         private void btnExplore_Click(object sender, EventArgs e)
         {
-            string dir = Path.GetDirectoryName(txtExePath.Text);
+            var dir = Path.GetDirectoryName(txtExePath.Text);
             if (Directory.Exists(dir))
                 Process.Start(dir);
             else
@@ -124,16 +124,16 @@ namespace UXM
         private async void btnPatch_Click(object sender, EventArgs e)
         {
             EnableControls(false);
-            cts = new CancellationTokenSource();
-            string error = await Task.Run(() => ExePatcher.Patch(txtExePath.Text, progress, cts.Token));
+            _cts = new CancellationTokenSource();
+            var error = await Task.Run(() => ExePatcher.Patch(txtExePath.Text, _progress, _cts.Token));
 
-            if (cts.Token.IsCancellationRequested)
+            if (_cts.Token.IsCancellationRequested)
             {
-                progress.Report((0, "Patching aborted."));
+                _progress.Report((0, "Patching aborted."));
             }
             else if (error != null)
             {
-                progress.Report((0, "Patching failed."));
+                _progress.Report((0, "Patching failed."));
                 ShowError(error);
             }
             else
@@ -141,32 +141,32 @@ namespace UXM
                 SystemSounds.Asterisk.Play();
             }
 
-            cts.Dispose();
-            cts = null;
+            _cts.Dispose();
+            _cts = null;
             EnableControls(true);
 
-            if (closing)
+            if (_closing)
                 Close();
         }
 
         private async void btnRestore_Click(object sender, EventArgs e)
         {
-            DialogResult choice = MessageBox.Show("Restoring the game will delete any modified files you have installed.\n" +
-                "Do you want to proceed?", "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            var choice = MessageBox.Show("Restoring the game will delete any modified files you have installed.\n" +
+                                         "Do you want to proceed?", "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
             if (choice == DialogResult.No)
                 return;
 
             EnableControls(false);
-            cts = new CancellationTokenSource();
-            string error = await Task.Run(() => GameRestorer.Restore(txtExePath.Text, progress, cts.Token));
+            _cts = new CancellationTokenSource();
+            var error = await Task.Run(() => GameRestorer.Restore(txtExePath.Text, _progress, _cts.Token));
 
-            if (cts.Token.IsCancellationRequested)
+            if (_cts.Token.IsCancellationRequested)
             {
-                progress.Report((0, "Restoration aborted."));
+                _progress.Report((0, "Restoration aborted."));
             }
             else if (error != null)
             {
-                progress.Report((0, "Restoration failed."));
+                _progress.Report((0, "Restoration failed."));
                 ShowError(error);
             }
             else
@@ -174,27 +174,27 @@ namespace UXM
                 SystemSounds.Asterisk.Play();
             }
 
-            cts.Dispose();
-            cts = null;
+            _cts.Dispose();
+            _cts = null;
             EnableControls(true);
 
-            if (closing)
+            if (_closing)
                 Close();
         }
 
         private async void btnUnpack_Click(object sender, EventArgs e)
         {
             EnableControls(false);
-            cts = new CancellationTokenSource();
-            string error = await Task.Run(() => ArchiveUnpacker.Unpack(txtExePath.Text, progress, cts.Token));
+            _cts = new CancellationTokenSource();
+            var error = await Task.Run(() => ArchiveUnpacker.Unpack(txtExePath.Text, _progress, _cts.Token));
 
-            if (cts.Token.IsCancellationRequested)
+            if (_cts.Token.IsCancellationRequested)
             {
-                progress.Report((0, "Unpacking aborted."));
+                _progress.Report((0, "Unpacking aborted."));
             }
             else if (error != null)
             {
-                progress.Report((0, "Unpacking failed."));
+                _progress.Report((0, "Unpacking failed."));
                 ShowError(error);
             }
             else
@@ -202,17 +202,17 @@ namespace UXM
                 SystemSounds.Asterisk.Play();
             }
 
-            cts.Dispose();
-            cts = null;
+            _cts.Dispose();
+            _cts = null;
             EnableControls(true);
 
-            if (closing)
+            if (_closing)
                 Close();
         }
 
         private void ShowError(string message)
         {
-            MessageBox.Show(message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(message, @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         private void EnableControls(bool enable)
